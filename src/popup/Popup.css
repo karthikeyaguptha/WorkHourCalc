@@ -1,69 +1,87 @@
-/* 🔥 Chrome popup root fix */
+/* ============================
+   Chrome popup root fix
+============================ */
 html,
 body {
   width: 300px;
   margin: 0;
   padding: 0;
 
-  background: linear-gradient(
-    0deg,
-    rgba(2, 0, 36, 1) 0%,
-    rgba(9, 9, 121, 1) 34%,
-    rgba(0, 212, 255, 1) 100%
-  );
+  background: linear-gradient(0deg,
+      rgba(2, 0, 36, 1) 0%,
+      rgba(9, 9, 121, 1) 34%,
+      rgba(0, 212, 255, 1) 100%);
 
   border-radius: 18px;
   overflow: hidden;
 
-  /* ✅ Font improvement */
-  font-family: "Lato", "Segoe UI", Tahoma, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Lato", "Segoe UI", Tahoma, system-ui,
+    -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-
-/* Main container now transparent */
+/* ============================
+   Main container
+============================ */
 .container {
+  position: relative;
   width: 100%;
   padding: 12px 14px 14px;
-
-  background: transparent; /* 👈 IMPORTANT */
-  color: #ffffff;
-
   box-sizing: border-box;
+  color: #ffffff;
 }
 
-/* Title */
+/* ============================
+   Top-right 24h hint
+============================ */
+.top-hint {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+
+  font-size: 10px;
+  color: #000;
+  opacity: 0.75;
+
+  pointer-events: none;
+}
+
+/* ============================
+   Title
+============================ */
 .title {
   text-align: center;
   font-size: 17px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin: 8px 0 10px;
 }
 
-/* Row */
+/* ============================
+   Input rows
+============================ */
 .row {
   display: flex;
   gap: 8px;
 }
 
-/* Field */
 .field {
   flex: 1;
 }
 
-/* Labels */
 label {
+  display: block;
   font-size: 11px;
   opacity: 0.9;
   margin-bottom: 3px;
-  display: block;
 }
 
-/* Inputs */
+/* ============================
+   Inputs
+============================ */
 input {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 8px;
 
+  padding: 7px 9px;
   border-radius: 10px;
   border: none;
   outline: none;
@@ -72,23 +90,48 @@ input {
   margin-bottom: 8px;
 }
 
-/* Disabled input */
+input::placeholder {
+  opacity: 0.6;
+}
+
+/* Disabled (Out Time) */
 input:disabled {
   background: rgba(255, 255, 255, 0.7);
   color: #000;
 }
 
-/* Timers */
+/* ============================
+   Error message
+============================ */
+.error {
+  font-size: 11px;
+  color: #ffd6d6;
+  margin: 2px 0 6px;
+}
+
+/* ============================
+   Timers
+============================ */
 .timers {
   display: flex;
   justify-content: space-between;
+
   font-size: 12px;
   margin: 6px 0 10px;
 }
 
-/* Buttons */
+/* ============================
+   Buttons
+============================ */
+.button-row {
+  display: flex;
+  gap: 10px;
+}
+
 button {
+  flex: 1;
   padding: 8px 0;
+
   border-radius: 12px;
   border: none;
 
@@ -96,35 +139,67 @@ button {
   font-weight: 500;
 
   cursor: pointer;
-  transition: transform 0.1s ease, opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+/* Start button */
+button:first-child {
+  background: #ffffff;
+  color: #090979;
+}
+
+/* Reset button */
+button:last-child {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 button:active {
   transform: scale(0.97);
 }
 
-.button-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 6px;
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.button-row button {
-  flex: 1;
+
+.completed-banner {
+  margin: 6px auto 8px;
+  padding: 6px 12px;
+
+  width: fit-content;
+  max-width: 90%;
+
+  background: rgba(0, 0, 0, 0.35); /* 👈 contrast */
+  border-radius: 12px;
+
+  font-size: 12px;
+  font-weight: 600;
+  color: #000000;
+  text-align: center;
+
+  animation: fadeInOut 10s ease forwards;
+  pointer-events: none;
 }
 
-input::placeholder {
-  opacity: 0.6;
-}
 
-.top-hint {
-  position: absolute;
-  top: 8px;
-  right: 12px;
 
-  font-size: 10px;
-  color: #000;          /* ✅ black text */
-  opacity: 0.7;
 
-  pointer-events: none; /* avoids interaction issues */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }

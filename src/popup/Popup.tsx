@@ -1,171 +1,258 @@
 import React, { useEffect, useState } from "react";
-import { parseHHMM, formatHHMM, formatDuration } from "../utils/time";
-import { saveData, loadData } from "../utils/storage";
-import { WorkHistory } from "../types/history";
 import "./Popup.css";
 
-interface StoredState {
-  entryTimestamp: number;
-  outTimestamp: number;
-  entryTime: string;
-  requiredTime: string;
-  history: WorkHistory[];
-}
+/* ============================
+   Helpers
+============================ */
 
+/** Safe HH:mm input with auto ":" */
 function handleTimeChange(
   value: string,
   setValue: (v: string) => void
 ) {
-  // Allow only digits and colon
   if (!/^[0-9:]*$/.test(value)) return;
-
-  // Auto-add colon after HH
+  if ((value.match(/:/g) || []).length > 1) return;
   if (value.length === 2 && !value.includes(":")) {
     value = value + ":";
   }
-
-  // Limit length to HH:mm
   if (value.length > 5) return;
-
-  const parts = value.split(":");
-  const hours = parts[0] ? Number(parts[0]) : null;
-  const mins = parts[1] ? Number(parts[1]) : null;
-
-  if (hours !== null && hours > 23) return;
-  if (mins !== null && mins > 59) return;
-
   setValue(value);
 }
 
+/** Normalize on blur */
+function normalizeTime(value: string): string {
+  if (!value) return "";
+  const [h = "00", m = "00"] = value.split(":");
+  return `${h.padStart(2, "0")}:${m.padEnd(2, "0")}`;
+}
+
+/** Check future entry */
+function isEntryInFuture(entry: string): boolean {
+  const [h, m] = entry.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return false;
+  const now = new Date();
+  const entryDate = new Date();
+  entryDate.setHours(h, m, 0, 0);
+  return entryDate.getTime() > now.getTime();
+}
+
+/** Format duration ms → HH:mm:ss */
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h.toString().padStart(2, "0")}:${m
+    .toString()
+    .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+/* ============================
+   Popup Component
+============================ */
+
 export default function Popup() {
+  /* ---------- State ---------- */
   const [entryTime, setEntryTime] = useState("");
   const [requiredTime, setRequiredTime] = useState("");
   const [outTime, setOutTime] = useState("");
-  const [countUp, setCountUp] = useState("");
-  const [countDown, setCountDown] = useState("");
-  const [history, setHistory] = useState<WorkHistory[]>([]);
+  const [worked, setWorked] = useState("");
+  const [remaining, setRemaining] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
   const [timestamps, setTimestamps] = useState<{
     entry: number;
     out: number;
   } | null>(null);
 
-  useEffect(() => {
-    loadData<StoredState>().then((data) => {
-      if (!data) return;
-      setEntryTime(data.entryTime);
-      setRequiredTime(data.requiredTime);
-      setHistory(data.history || []);
-      setTimestamps({
-        entry: data.entryTimestamp,
-        out: data.outTimestamp
-      });
-      setOutTime(
-        formatHHMM(
-          parseHHMM(data.entryTime) + parseHHMM(data.requiredTime)
-        )
-      );
-    });
-  }, []);
+  /* Info / completion pill */
+  const [infoMessage, setInfoMessage] = useState<string | null>(
+    "⏱ Use 24-hour format (HH:mm)"
+  );
+  const [hasShownCompleted, setHasShownCompleted] = useState(false);
 
+  /* ---------- Derived states ---------- */
+  const now = Date.now();
+  const isRunning = timestamps !== null && now < timestamps.out;
+  const isCompleted = timestamps !== null && now >= timestamps.out;
+  const isRequiredValid =
+    requiredTime !== "" && requiredTime !== "00:00";
+
+  /* ============================
+     Timer effect
+  ============================ */
   useEffect(() => {
     if (!timestamps) return;
 
+    const totalDurationMs = timestamps.out - timestamps.entry;
+
     const interval = setInterval(() => {
       const now = Date.now();
-      setCountUp(formatDuration(now - timestamps.entry));
-      setCountDown(formatDuration(timestamps.out - now));
+
+      const elapsedMs = Math.min(
+        Math.max(0, now - timestamps.entry),
+        totalDurationMs
+      );
+
+      const remainingMs = Math.max(
+        0,
+        timestamps.out - now
+      );
+
+      setWorked(formatDuration(elapsedMs));
+      setRemaining(formatDuration(remainingMs));
+
+      // One-time completion trigger
+      if (remainingMs === 0 && !hasShownCompleted) {
+        setInfoMessage("🎉 Work Hours Completed");
+        setHasShownCompleted(true);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timestamps]);
+  }, [timestamps, hasShownCompleted]);
+
+  /* ============================
+     Info message auto-hide
+  ============================ */
+  useEffect(() => {
+    if (!infoMessage) return;
+
+    const timer = setTimeout(() => {
+      setInfoMessage(null);
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [infoMessage]);
+
+  /* ============================
+     Actions
+  ============================ */
 
   function startTimer() {
-    if (!entryTime || !requiredTime) return alert("Invalid input");
+    setError(null);
 
-    const now = new Date();
+    if (!entryTime || !requiredTime) {
+      setError("Please enter Entry and Required time");
+      return;
+    }
+
+    if (isEntryInFuture(entryTime)) {
+      setError("Entry time cannot be in the future");
+      return;
+    }
+
     const [eh, em] = entryTime.split(":").map(Number);
-    const entry = new Date(now);
-    entry.setHours(eh, em, 0, 0);
+    const [rh, rm] = requiredTime.split(":").map(Number);
 
-    const durationMs = parseHHMM(requiredTime) * 60 * 1000;
-    const out = entry.getTime() + durationMs;
+    const entryDate = new Date();
+    entryDate.setHours(eh, em, 0, 0);
 
+    const durationMs = (rh * 60 + rm) * 60 * 1000;
+    const outTimestamp = entryDate.getTime() + durationMs;
+
+    const outDate = new Date(outTimestamp);
     setOutTime(
-      formatHHMM(parseHHMM(entryTime) + parseHHMM(requiredTime))
+      `${outDate.getHours().toString().padStart(2, "0")}:${outDate
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`
     );
 
-    const state: StoredState = {
-      entryTimestamp: entry.getTime(),
-      outTimestamp: out,
-      entryTime,
-      requiredTime,
-      history
-    };
-
-    setTimestamps({ entry: entry.getTime(), out });
-    saveData(state);
+    setTimestamps({
+      entry: entryDate.getTime(),
+      out: outTimestamp
+    });
   }
 
   function reset() {
-    saveData(null);
+    setEntryTime("");
+    setRequiredTime("");
+    setOutTime("");
+    setWorked("");
+    setRemaining("");
     setTimestamps(null);
-    setCountUp("");
-    setCountDown("");
+    setError(null);
+
+    setInfoMessage("⏱ Use 24-hour format (HH:mm)");
+    setHasShownCompleted(false);
   }
+
+  /* ============================
+     UI
+  ============================ */
 
   return (
     <div className="container">
       <h3 className="title">Work Hours</h3>
+
+      {infoMessage && (
+        <div className="completed-banner">
+          {infoMessage}
+        </div>
+      )}
 
       <div className="row">
         <div className="field">
           <label>Entry Time</label>
           <input
             type="text"
-            placeholder="HH:mm (24h)"
+            placeholder="HH:mm"
             value={entryTime}
             onChange={(e) =>
               handleTimeChange(e.target.value, setEntryTime)
             }
+            onBlur={() =>
+              setEntryTime(normalizeTime(entryTime))
+            }
           />
-
         </div>
 
         <div className="field">
           <label>Required Hours to Work</label>
           <input
             type="text"
-            placeholder="HH:mm (24h)"
+            placeholder="HH:mm"
             value={requiredTime}
             onChange={(e) =>
               handleTimeChange(e.target.value, setRequiredTime)
             }
+            onBlur={() =>
+              setRequiredTime(normalizeTime(requiredTime))
+            }
           />
         </div>
       </div>
-      <div className="top-hint">
-        ⏱ Use 24-hour format (HH:mm)
-      </div>
+
+      {error && <div className="error">{error}</div>}
 
       <label>Out Time</label>
       <input value={outTime} disabled />
 
       <div className="timers">
-        <span><b>Worked:</b> {countUp}</span>
-        <span><b>Remaining:</b> {countDown}</span>
+        <span>
+          <b>Worked:</b> {worked}
+        </span>
+        <span>
+          <b>Remaining:</b> {remaining}
+        </span>
       </div>
 
       <div className="button-row">
-        <button onClick={startTimer}>Start</button>
-        <button onClick={reset}>Reset</button>
-      </div>
+        <button
+          onClick={startTimer}
+          disabled={!isRequiredValid || isRunning || isCompleted}
+        >
+          {isRunning ? "Running…" : "Start"}
+        </button>
 
-      {/* <h4>History</h4>
-      {history.map((h, i) => (
-        <div key={i} className="history">
-          {h.date} | {h.entryTime} → {h.outTime}
-        </div>
-      ))} */}
+        <button
+          onClick={reset}
+          disabled={!timestamps}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
