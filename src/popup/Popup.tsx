@@ -12,6 +12,31 @@ interface StoredState {
   history: WorkHistory[];
 }
 
+function handleTimeChange(
+  value: string,
+  setValue: (v: string) => void
+) {
+  // Allow only digits and colon
+  if (!/^[0-9:]*$/.test(value)) return;
+
+  // Auto-add colon after HH
+  if (value.length === 2 && !value.includes(":")) {
+    value = value + ":";
+  }
+
+  // Limit length to HH:mm
+  if (value.length > 5) return;
+
+  const parts = value.split(":");
+  const hours = parts[0] ? Number(parts[0]) : null;
+  const mins = parts[1] ? Number(parts[1]) : null;
+
+  if (hours !== null && hours > 23) return;
+  if (mins !== null && mins > 59) return;
+
+  setValue(value);
+}
+
 export default function Popup() {
   const [entryTime, setEntryTime] = useState("");
   const [requiredTime, setRequiredTime] = useState("");
@@ -92,31 +117,48 @@ export default function Popup() {
     <div className="container">
       <h3 className="title">Work Hours</h3>
 
-<div className="row">
-  <div className="field">
-    <label>Entry</label>
-    <input type="time" value={entryTime} onChange={(e) => setEntryTime(e.target.value)} />
-  </div>
+      <div className="row">
+        <div className="field">
+          <label>Entry Time</label>
+          <input
+            type="text"
+            placeholder="HH:mm (24h)"
+            value={entryTime}
+            onChange={(e) =>
+              handleTimeChange(e.target.value, setEntryTime)
+            }
+          />
 
-  <div className="field">
-    <label>Required</label>
-    <input type="time" value={requiredTime} onChange={(e) => setRequiredTime(e.target.value)} />
-  </div>
-</div>
+        </div>
 
+        <div className="field">
+          <label>Required Hours to Work</label>
+          <input
+            type="text"
+            placeholder="HH:mm (24h)"
+            value={requiredTime}
+            onChange={(e) =>
+              handleTimeChange(e.target.value, setRequiredTime)
+            }
+          />
+        </div>
+      </div>
+      <div className="top-hint">
+        ⏱ Use 24-hour format (HH:mm)
+      </div>
 
       <label>Out Time</label>
       <input value={outTime} disabled />
 
-     <div className="timers">
-  <span><b>Worked:</b> {countUp}</span>
-  <span><b>Remaining:</b> {countDown}</span>
-</div>
+      <div className="timers">
+        <span><b>Worked:</b> {countUp}</span>
+        <span><b>Remaining:</b> {countDown}</span>
+      </div>
 
-<div className="button-row">
-  <button onClick={startTimer}>Start</button>
-  <button onClick={reset}>Reset</button>
-</div>
+      <div className="button-row">
+        <button onClick={startTimer}>Start</button>
+        <button onClick={reset}>Reset</button>
+      </div>
 
       {/* <h4>History</h4>
       {history.map((h, i) => (
