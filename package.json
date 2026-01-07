@@ -4,19 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+
+    "build:chrome": "vite build && npx copyfiles -f src/manifest.chrome.json dist && move dist\\manifest.chrome.json dist\\manifest.json && npx copyfiles -f src/icons/* dist/icons",
+
+    "build:firefox": "vite build && npx copyfiles -f src/manifest.firefox.json dist && move dist\\manifest.firefox.json dist\\manifest.json && npx copyfiles -f src/icons/* dist/icons"
+
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
+    "@types/chrome": "^0.1.32",
     "@types/node": "^25.0.3",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.2.1",
+    "copyfiles": "^2.4.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.10"
   }

@@ -1,6 +1,24 @@
 import React, { useEffect, useState } from "react";
 import "./Popup.css";
 
+import browser from "webextension-polyfill";
+
+
+const STORAGE_KEY = "work_hours_session";
+
+function saveSession(data: any) {
+  browser.storage.local.set({ [STORAGE_KEY]: data });
+}
+
+function loadSession(): Promise<any> {
+  return new Promise((resolve) => {
+    browser.storage.local.get(STORAGE_KEY, (result) => {
+      resolve(result[STORAGE_KEY] || null);
+    });
+  });
+}
+
+
 /* ============================
    Helpers
 ============================ */
@@ -10,21 +28,54 @@ function handleTimeChange(
   value: string,
   setValue: (v: string) => void
 ) {
+  // Allow only digits and colon
   if (!/^[0-9:]*$/.test(value)) return;
+
+  // Prevent more than one colon
   if ((value.match(/:/g) || []).length > 1) return;
-  if (value.length === 2 && !value.includes(":")) {
-    value = value + ":";
+
+  // Split parts
+  let [h, m] = value.split(":");
+
+  // Auto-pad single digit hour and add colon
+  if (h.length === 1 && !value.includes(":") && value.length === 1) {
+    // wait for second digit OR blur
+    setValue(value);
+    return;
   }
+
+  if (h.length === 2 && !value.includes(":")) {
+    value = h + ":";
+    setValue(value);
+    return;
+  }
+
+  // Validate hour
+  if (h && Number(h) > 23) return;
+
+  // Validate minutes
+  if (m && Number(m) > 59) return;
+
+  // Max length HH:mm
   if (value.length > 5) return;
+
   setValue(value);
 }
+
+
 
 /** Normalize on blur */
 function normalizeTime(value: string): string {
   if (!value) return "";
+
   const [h = "00", m = "00"] = value.split(":");
-  return `${h.padStart(2, "0")}:${m.padEnd(2, "0")}`;
+
+  if (Number(h) > 23 || Number(m) > 59) return "";
+
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
 }
+
+
 
 /** Check future entry */
 function isEntryInFuture(entry: string): boolean {
@@ -112,6 +163,35 @@ export default function Popup() {
     return () => clearInterval(interval);
   }, [timestamps, hasShownCompleted]);
 
+  useEffect(() => {
+    loadSession().then((data) => {
+      if (!data) return;
+
+      setEntryTime(data.entryTime || "");
+      setRequiredTime(data.requiredTime || "");
+      setOutTime(data.outTime || "");
+      setTimestamps(data.timestamps || null);
+      setHasShownCompleted(data.hasShownCompleted || false);
+
+      // Restore info pill only if session is active
+      if (data.timestamps) {
+        setInfoMessage(null);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    saveSession({
+      entryTime,
+      requiredTime,
+      outTime,
+      timestamps,
+      hasShownCompleted
+    });
+  }, [entryTime, requiredTime, outTime, timestamps, hasShownCompleted]);
+
+
+
   /* ============================
      Info message auto-hide
   ============================ */
@@ -166,6 +246,8 @@ export default function Popup() {
   }
 
   function reset() {
+    browser.storage.local.remove(STORAGE_KEY);
+
     setEntryTime("");
     setRequiredTime("");
     setOutTime("");
@@ -177,6 +259,7 @@ export default function Popup() {
     setInfoMessage("⏱ Use 24-hour format (HH:mm)");
     setHasShownCompleted(false);
   }
+
 
   /* ============================
      UI
@@ -202,10 +285,11 @@ export default function Popup() {
             onChange={(e) =>
               handleTimeChange(e.target.value, setEntryTime)
             }
-            onBlur={() =>
-              setEntryTime(normalizeTime(entryTime))
-            }
+            onBlur={() => setEntryTime(normalizeTime(entryTime))}
+
+
           />
+
         </div>
 
         <div className="field">
@@ -217,10 +301,10 @@ export default function Popup() {
             onChange={(e) =>
               handleTimeChange(e.target.value, setRequiredTime)
             }
-            onBlur={() =>
-              setRequiredTime(normalizeTime(requiredTime))
-            }
+            onBlur={() => setRequiredTime(normalizeTime(requiredTime))}
+
           />
+
         </div>
       </div>
 
